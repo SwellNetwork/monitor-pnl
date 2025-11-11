@@ -217,17 +217,6 @@ def main():
         process_logs(logs_folder, pnl_logs_folder)
     else:
         print(f"Warning: {logs_folder} does not exist")
-    
-    # Process old_logs folder -> pnl_old_logs folder
-    old_logs_folder = base_path / "old_logs"
-    pnl_old_logs_folder = base_path / "pnl_old_logs"
-    if old_logs_folder.exists():
-        print("\n" + "="*60)
-        print("Processing old_logs folder -> pnl_old_logs folder")
-        print("="*60)
-        process_logs(old_logs_folder, pnl_old_logs_folder)
-    else:
-        print(f"Warning: {old_logs_folder} does not exist")
 
 if __name__ == "__main__":
     main()

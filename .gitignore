@@ -47,7 +47,6 @@ backup2/
 pnl_logs/
 pnl_logs_v2/
 pnl_old_logs/
-*.csv
 
 # IDE / Editor
 .vscode/
