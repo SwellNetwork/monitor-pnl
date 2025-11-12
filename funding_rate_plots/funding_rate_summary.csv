@@ -1,0 +1,9 @@
+file,hyperliquid_mean_pct,lighter_mean_pct,plot
+BTC_2025-11-09_funding_rates.csv,0.0010160063727168952,0.001199657534246575,BTC_2025-11-09_funding_rates_funding_rates.png
+BTC_2025-11-09_session6_funding_rates.csv,0.0010150593910806178,0.0012,BTC_2025-11-09_session6_funding_rates_funding_rates.png
+ETH_2025-11-09_funding_rates.csv,0.0012500000000000005,0.000376255707762557,ETH_2025-11-09_funding_rates_funding_rates.png
+ETH_2025-11-09_session5_funding_rates.csv,0.0012500000000000005,0.0003768439108061749,ETH_2025-11-09_session5_funding_rates_funding_rates.png
+HYPE_2025-11-09_funding_rates.csv,0.0005497127853881281,0.00032351598173515966,HYPE_2025-11-09_funding_rates_funding_rates.png
+HYPE_2025-11-09_session8_funding_rates.csv,0.0005484612921669527,0.0003216981132075471,HYPE_2025-11-09_session8_funding_rates_funding_rates.png
+SOL_2025-11-09_funding_rates.csv,0.000395927425799087,-0.0015246575342465754,SOL_2025-11-09_funding_rates_funding_rates.png
+SOL_2025-11-09_session7_funding_rates.csv,0.00039689601772441405,-0.00152221269296741,SOL_2025-11-09_session7_funding_rates_funding_rates.png
