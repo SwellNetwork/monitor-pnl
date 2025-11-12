@@ -464,7 +464,8 @@ def process_logs(input_folder: Path, output_folder: Path):
 
 def main():
     base_path = Path(__file__).parent
-    
+    # logs_folder = base_path / "logs_new"
+    # pnl_logs_folder = base_path / "new_pnl_logs"
     # Process logs folder -> pnl_logs folder
     logs_folder = base_path / "logs"
     pnl_logs_folder = base_path / "pnl_logs"
