@@ -40,6 +40,20 @@ market_data_re = re.compile(
     r"y_market_data=MarketData.*?funding_rate=(?P<y_fr>[\d\.eE\-]+)",
     re.DOTALL
 )
+# Regex to extract prices from hold actions (processed market data with HOLD decision)
+hold_action_re = re.compile(
+    r"processed market data.*?trade_id='(?P<trade_id>[a-f0-9\-]+)'.*?"
+    r"market_data=PairedMarketData\(timestamp=(?P<ts>datetime\.datetime\([^\)]*\)).*?"
+    r"x_market_data=MarketData.*?price=(?P<x_price>[\d\.eE\-]+).*?"
+    r"y_market_data=MarketData.*?price=(?P<y_price>[\d\.eE\-]+).*?"
+    r"decision=EngineDecision\(action=<EngineAction\.HOLD: 'hold'>",
+    re.DOTALL
+)
+# Regex to extract timestamp from ticker snapshot lines
+ticker_snapshot_re = re.compile(
+    r"(?:hyperliquid|lighter) ticker snapshot asset=(?P<asset>\w+) timestamp=(?P<ts>[\d\-]+T[\d:]+(?:\.[\d]+)?[\+\d:]+) duration_ms=\d+",
+    re.DOTALL
+)
 
 
 def price_pnl(is_long: bool, entry: float, exit: float, size: float) -> float:
@@ -154,16 +168,38 @@ def py_datetime_str_to_dt(s: str) -> datetime:
         return datetime(y, M, d, h, m, sec, tzinfo=timezone.utc)
     return None
 
+def parse_iso_timestamp(ts_str: str) -> datetime:
+    """Parse ISO format timestamp like '2025-11-11T03:03:24.247587+00:00'"""
+    try:
+        # Remove timezone info and parse
+        if '+' in ts_str:
+            ts_part = ts_str.split('+')[0]
+        elif 'Z' in ts_str:
+            ts_part = ts_str.replace('Z', '')
+        else:
+            ts_part = ts_str
+        
+        # Parse the datetime part
+        if '.' in ts_part:
+            dt_part, usec_part = ts_part.split('.')
+            usec = int(usec_part[:6].ljust(6, '0'))  # Pad to microseconds
+        else:
+            dt_part = ts_part
+            usec = 0
+        
+        dt = datetime.strptime(dt_part, '%Y-%m-%dT%H:%M:%S')
+        return dt.replace(microsecond=usec, tzinfo=timezone.utc)
+    except Exception:
+        return None
+
 def process_single_log_file(log_file: Path, output_folder: Path):
     """Process a single log file and save CSV to output_folder."""
     try:
         # Read log file
         raw = log_file.read_text(encoding="utf-8", errors="ignore")
         
-        # Track latest observed prices per exchange to support simulated exits
-        latest_price_by_exchange = {}
-        for op_match in op_re.finditer(raw):
-            latest_price_by_exchange[op_match.group("ex").lower()] = float(op_match.group("px"))
+        # Extract asset from log filename (e.g., BTC_2025-11-09_session6.log -> BTC)
+        asset = log_file.stem.split('_')[0]
 
         # --- ENTRY PARSING ---
         entries = []
@@ -190,6 +226,17 @@ def process_single_log_file(log_file: Path, output_folder: Path):
         if not entries:
             return 0, "No entries found"
 
+        entries.sort(key=lambda ent: ent["entry_time"] or datetime.min.replace(tzinfo=timezone.utc))
+
+        # Group entries by trade_id and keep only the first entry for each trade_id
+        first_entries_by_trade_id = {}
+        for ent in entries:
+            trade_id = ent["trade_id"]
+            if trade_id not in first_entries_by_trade_id:
+                first_entries_by_trade_id[trade_id] = ent
+
+        # Use only the first entry for each trade_id
+        entries = list(first_entries_by_trade_id.values())
         entries.sort(key=lambda ent: ent["entry_time"] or datetime.min.replace(tzinfo=timezone.utc))
 
         processed_trade_ids = set()
@@ -330,8 +377,27 @@ def process_single_log_file(log_file: Path, output_folder: Path):
             states = simulated_candidate["states"]
             hours_open = states[-1]["hours"] if states else 0.0
 
-            x_exit_px = latest_price_by_exchange.get(entry["x"]["ex"], entry["x"]["entry_price"])
-            y_exit_px = latest_price_by_exchange.get(entry["y"]["ex"], entry["y"]["entry_price"])
+            # Find the last hold action for this trade_id and extract prices from it
+            trade_id = entry["trade_id"]
+            last_hold_prices = {"x": None, "y": None}
+            last_hold_time = None
+            
+            # Search for all hold actions for this trade_id
+            for hold_match in hold_action_re.finditer(raw, entry["entry_log_pos"]):
+                if hold_match.group("trade_id") != trade_id:
+                    continue
+                ts_str = hold_match.group("ts")
+                ts_dt = py_datetime_str_to_dt(ts_str)
+                if ts_dt and ts_dt >= entry["entry_time"]:
+                    # This is a hold action after entry, update if it's later
+                    if last_hold_time is None or ts_dt > last_hold_time:
+                        last_hold_time = ts_dt
+                        last_hold_prices["x"] = float(hold_match.group("x_price"))
+                        last_hold_prices["y"] = float(hold_match.group("y_price"))
+            
+            # Use prices from last hold action, or fall back to entry prices if no hold found
+            x_exit_px = last_hold_prices["x"] if last_hold_prices["x"] is not None else entry["x"]["entry_price"]
+            y_exit_px = last_hold_prices["y"] if last_hold_prices["y"] is not None else entry["y"]["entry_price"]
 
             # Extract funding rate updates for simulated order
             sim_funding_rate_updates = []
@@ -381,8 +447,20 @@ def process_single_log_file(log_file: Path, output_folder: Path):
                 pays = (is_long and fr > 0) or ((not is_long) and fr < 0)
                 return "you_pay" if pays else "you_receive"
 
+            # Find the last ticker snapshot timestamp for this asset
             exit_time = None
-            if entry["entry_time"] and hours_open:
+            last_snapshot_time = None
+            for snapshot_match in ticker_snapshot_re.finditer(raw):
+                if snapshot_match.group("asset") == asset:
+                    ts_str = snapshot_match.group("ts")
+                    ts_dt = parse_iso_timestamp(ts_str)
+                    if ts_dt and (last_snapshot_time is None or ts_dt > last_snapshot_time):
+                        last_snapshot_time = ts_dt
+            
+            # Use snapshot timestamp if available, otherwise calculate from hours_open
+            if last_snapshot_time:
+                exit_time = last_snapshot_time
+            elif entry["entry_time"] and hours_open:
                 exit_time = entry["entry_time"] + timedelta(hours=hours_open)
 
             simulated_orders.append({

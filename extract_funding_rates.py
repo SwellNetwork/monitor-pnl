@@ -121,8 +121,8 @@ def main():
     base_path = Path(__file__).parent
     
     # Process logs folder -> funding_rates folder
-    logs_folder = base_path / "logs"
-    funding_rates_folder = base_path / "funding_rates"
+    logs_folder = base_path / "logs_new"
+    funding_rates_folder = base_path / "new_funding_rates"
     
     if logs_folder.exists():
         print("\n" + "="*60)

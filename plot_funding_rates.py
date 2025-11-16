@@ -57,7 +57,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default="funding_rates",
+        default="new_funding_rates",
         help="Directory containing funding rate CSV files.",
     )
     parser.add_argument(
