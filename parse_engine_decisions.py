@@ -12,7 +12,7 @@ For each EngineDecision, extracts:
 - Receiver (x or y)
 - Which side is long and which side is short
 """
-
+# python parse_engine_decisions.py --batch logs --output decisions_output_v2
 import re
 import pandas as pd
 from pathlib import Path
@@ -114,7 +114,35 @@ def parse_engine_decision_line(line: str) -> Optional[Dict]:
         "receiver": None,
         "x_is_long": None,
         "y_is_long": None,
+        "exit_reason": None,
+        "reason": None,
     }
+    
+    # Extract exit_reason from ExitPlan's exit_info (for EXIT actions)
+    if action == "exit":
+        # Look for exit_reason in ExitPlan's exit_info
+        # First try to find it in exit_info=ExitInfo(...)
+        exit_info_start = line.find("exit_info=ExitInfo")
+        if exit_info_start != -1:
+            # Look for exit_reason after exit_info=ExitInfo
+            exit_info_section = line[exit_info_start:exit_info_start+1000]  # Look at next 1000 chars
+            exit_reason_match = re.search(r"exit_reason='([^']+)'", exit_info_section)
+            if exit_reason_match:
+                result["exit_reason"] = exit_reason_match.group(1)
+        
+        # Fallback: look for exit_reason in operations metadata
+        if result["exit_reason"] is None:
+            exit_reason_op_match = re.search(r"'exit_reason':\s*'([^']+)'", line)
+            if exit_reason_op_match:
+                result["exit_reason"] = exit_reason_op_match.group(1)
+    
+    # Extract reason from EngineDecision (usually None for HOLD/ENTER)
+    reason_match = re.search(r"reason=(None|'[^']+'|\"[^\"]+\")", line)
+    if reason_match:
+        reason_str = reason_match.group(1)
+        if reason_str != "None":
+            # Remove quotes
+            result["reason"] = reason_str.strip("'\"")
     
     # Extract plan information
     plan_match = re.search(r"plan=(EntryPlan|ExitPlan|None)", line)
@@ -250,7 +278,8 @@ def parse_log_file(log_file: Path) -> pd.DataFrame:
             "x_exchange", "y_exchange",
             "x_price", "y_price",
             "x_funding_rate", "y_funding_rate",
-            "receiver", "x_is_long", "y_is_long"
+            "receiver", "x_is_long", "y_is_long",
+            "exit_reason", "reason"
         ]
         # Only include columns that exist
         df = df[[col for col in column_order if col in df.columns]]
@@ -353,13 +382,26 @@ def main():
             print("Error: Please specify at least one folder for batch processing")
             sys.exit(1)
         
-        # Create output folder
+        # Determine output folder (can be specified with --output flag)
         output_folder = Path("decisions_output")
-        output_folder.mkdir(exist_ok=True)
+        folder_args = sys.argv[2:]
+        
+        # Check if --output flag is used
+        if "--output" in folder_args:
+            output_idx = folder_args.index("--output")
+            if output_idx + 1 < len(folder_args):
+                output_folder = Path(folder_args[output_idx + 1])
+                folder_args = [f for i, f in enumerate(folder_args) if i not in [output_idx, output_idx + 1]]
+            else:
+                print("Error: --output flag requires a folder path")
+                sys.exit(1)
+        
+        # Create output folder
+        output_folder.mkdir(exist_ok=True, parents=True)
         print(f"Output folder: {output_folder}")
         
         # Process each folder
-        for folder_arg in sys.argv[2:]:
+        for folder_arg in folder_args:
             folder_path = Path(folder_arg)
             if not folder_path.exists():
                 print(f"Warning: Folder not found: {folder_path}, skipping...")

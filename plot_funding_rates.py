@@ -9,6 +9,8 @@ import pandas as pd
 def load_funding_rates(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path, parse_dates=["timestamp"])
     df.sort_values("timestamp", inplace=True)
+    # Divide lighter funding rate by 100 to convert from percentage to decimal
+    df["lighter_funding_rate"] = df["lighter_funding_rate"] / 100.0
     return df
 
 
@@ -57,7 +59,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default="new_funding_rates",
+        default="funding_rates",
         help="Directory containing funding rate CSV files.",
     )
     parser.add_argument(
@@ -75,9 +77,9 @@ def main():
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory {input_dir} does not exist")
 
-    csv_files = sorted(input_dir.glob("*.csv"))
+    csv_files = sorted(input_dir.glob("*_funding_rates.csv"))
     if not csv_files:
-        raise FileNotFoundError(f"No CSV files found in {input_dir}")
+        raise FileNotFoundError(f"No *_funding_rates.csv files found in {input_dir}")
 
     summaries = []
     for csv_path in csv_files:
