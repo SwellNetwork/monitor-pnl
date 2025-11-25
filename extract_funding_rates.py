@@ -98,8 +98,8 @@ def process_csvs(input_folder: Path, output_folder: Path):
         if stem.startswith("logs_v3_"):
             stem = stem.replace("logs_v3_", "")
         # Remove old_logs_ prefix if present
-        if stem.startswith("old_logs_"):
-            stem = stem.replace("old_logs_", "")
+        if stem.startswith("logs_"):
+            stem = stem.replace("logs_", "")
         csv_filename = stem + "_funding_rates.csv"
         csv_path = output_folder / csv_filename
         
@@ -116,10 +116,8 @@ def process_csvs(input_folder: Path, output_folder: Path):
         else:
             # Extract output filename
             stem = Path(csv_name).stem.replace("_decisions", "")
-            if stem.startswith("logs_v3_"):
-                stem = stem.replace("logs_v3_", "")
-            if stem.startswith("old_logs_"):
-                stem = stem.replace("old_logs_", "")
+            if stem.startswith("logs_"):
+                stem = stem.replace("logs_", "")
             output_name = stem + "_funding_rates.csv"
             print(f"  ✓ {csv_name} -> {output_name} ({count} funding rate records)")
             total_records += count
@@ -127,10 +125,9 @@ def process_csvs(input_folder: Path, output_folder: Path):
 
 def main():
     base_path = Path(__file__).parent
-    
     # Process exit_only folder -> funding_rates folder
-    input_folder = base_path / "decisions_output" / "exit_only"
-    funding_rates_folder = base_path / "funding_rates"
+    input_folder = base_path / "decisions_output_v7" / "2025-11-21" / "1_Exist"
+    funding_rates_folder = base_path / "funding_rates_v3"
     
     if input_folder.exists():
         print("\n" + "="*60)

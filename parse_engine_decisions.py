@@ -12,7 +12,7 @@ For each EngineDecision, extracts:
 - Receiver (x or y)
 - Which side is long and which side is short
 """
-# python parse_engine_decisions.py --batch logs --output decisions_output_v2
+# python parse_engine_decisions.py --batch logs --output decisions_output_v6
 import re
 import pandas as pd
 from pathlib import Path
